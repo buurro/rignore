@@ -14,6 +14,7 @@ some_folder/some_file.txt
 some_folder/some_folder/
 some_folder/some_folder/some_file.txt
 an_image.jpg
+.include-me
 """.strip()
 
 
@@ -62,3 +63,39 @@ def test_filter_entry(folder: Path):
 
     for path in paths:
         assert path in expected_paths
+
+
+def test_overrides(tmp_path: Path):
+    folder = Path(tmp_path)
+
+    # Create a .gitignore that ignores .env files
+    gitignore = folder / ".gitignore"
+    gitignore.write_text("*.env\n")
+
+    # Create both an ignored file and one that should be included
+    (folder / ".env").touch()
+    (folder / ".env.example").touch()
+    (folder / "regular.txt").touch()
+
+    # Without overrides, .env and .env.example should be ignored
+    paths_without_override = list(rignore.walk(folder, read_git_ignore=True))
+    names_without = {p.name for p in paths_without_override}
+
+    assert ".env" not in names_without
+    assert ".env.example" not in names_without
+    assert "regular.txt" in names_without
+
+    # With overrides, only files matching the patterns will be included
+    # This includes .env.example (which was gitignored) and regular.txt
+    paths_with_override = list(
+        rignore.walk(
+            folder,
+            read_git_ignore=True,
+            overrides=[".env.example", "*.txt", ".include-me"],
+        )
+    )
+    names_with = {p.name for p in paths_with_override}
+
+    assert ".env" not in names_with
+    assert ".env.example" in names_with
+    assert "regular.txt" in names_with
